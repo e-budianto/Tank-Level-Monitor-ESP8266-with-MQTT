@@ -1,4 +1,4 @@
-# Tank-Level-Monitor-with-Remote-Visual-Display
+# Tank Level Monitor with Remote Visual Display of Water Level
 
 For the sending unit, this project uses an HC-SR04 Ultrasound Distance Sensor, DHT22 Temperature and Humidity Sensor, Photon Electron/Photon & Particle Cloud, and Ubidots (for data logging).
 
