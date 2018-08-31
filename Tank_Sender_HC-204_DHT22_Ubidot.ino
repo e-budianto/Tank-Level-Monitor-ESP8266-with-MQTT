@@ -1,5 +1,5 @@
 // These #include statement were automatically added by the Particle IDE.
-#include <Adafruit_DHT.h>
+
 #include <HC_SR04.h>
 
 #define trigPin D1
