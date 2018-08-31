@@ -1,9 +1,18 @@
 // These #include statement were automatically added by the Particle IDE.
-
+#include <ESP8266WiFi.h>
+#include <PubSubClient.h>
 #include <HC_SR04.h>
 
 #define trigPin D1
 #define echoPin D2
+
+const char* ssid = "YourNetworkName";
+const char* password =  "YourNetworkPassword";
+
+const char* mqttServer = "192.168.2.150";
+const int mqttPort = 8883;
+const char* mqttUser = "YourMqttUser";
+const char* mqttPassword = "YourMqttUserPassword";
 
 float inches2water = 0.0;
 float tank = 0.0;
@@ -27,13 +36,41 @@ You can change this range by supplying two extra parameters to the constructor o
 HC_SR04 rangefinder = HC_SR04(trigPin, echoPin, 5.0, 300.0);
 */
  
+WiFiClient espClient;
+PubSubClient client(espClient); 
 HC_SR04 rangefinder = HC_SR04(trigPin, echoPin, 5.0, 150.0);
- 
-void setup() 
-{
-    Serial.begin(9600);
-    delay(2000);
-    initialize();
+
+void setup() {
+
+  Serial.begin(115200);
+
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.println("Connecting to WiFi..");
+  }
+  Serial.println("Connected to the WiFi network");
+
+  client.setServer(mqttServer, mqttPort);
+  client.setCallback(callback);
+
+  while (!client.connected()) {
+    Serial.println("Connecting to MQTT...");
+
+    if (client.connect("ESP01-1", mqttUser, mqttPassword )) {
+
+      Serial.println("connected");  
+
+    } else {
+
+      Serial.print("failed with state ");
+      Serial.print(client.state());
+      delay(2000);
+
+    }
+  }
+  
 }
  
 void loop() 
@@ -41,9 +78,11 @@ void loop()
     counter++;
     if (counter==30) { //Every ~5min pull the numbers from HRC-SR04 Rangefinder
         watertank();
-        // Send to MQTT
+        client.publish("esp01-1/SENSOR/Tank", tank);
+        client.subscribe("esp01-1/SENSOR");
         counter = 0; //Reset the counter to start a new 5min count down
     }
+    client.loop();
     delay(5000);
 }
 
@@ -75,8 +114,17 @@ void watertank() {
  //End Will be changed
 }
 
-void initialize() {  //Take an initial reading so we don't have to wait 5min to see the results after reboot/updates
-    watertank();
- //Will be changed to MQTT
-//    ubidots.sendAll(); //Send all data at once to the Ubidot Cloud
+void callback(char* topic, byte* payload, unsigned int length) {
+
+  Serial.print("Message arrived in topic: ");
+  Serial.println(topic);
+
+  Serial.print("Message:");
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+  }
+
+  Serial.println();
+  Serial.println("-----------------------");
+
 }
