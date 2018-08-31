@@ -11,13 +11,13 @@ const char* password =  "YourNetworkPassword";
 
 const char* mqttServer = "192.168.2.150";
 const int mqttPort = 8883;
-const char* mqttUser = "YourMqttUser";
+const char* mqttUser = "mqtt_user";
 const char* mqttPassword = "YourMqttUserPassword";
 
-float inches2water = 0.0;
+float cm2water = 0.0;
 float tank = 0.0;
 int counter = 0;
-float tank_limit = 45.5; //Max distance to empty
+float tank_limit = 120; //Max distance to empty
 String percent;
 
 
@@ -38,7 +38,7 @@ HC_SR04 rangefinder = HC_SR04(trigPin, echoPin, 5.0, 300.0);
  
 WiFiClient espClient;
 PubSubClient client(espClient); 
-HC_SR04 rangefinder = HC_SR04(trigPin, echoPin, 5.0, 150.0);
+HC_SR04 rangefinder = HC_SR04(trigPin, echoPin, 30.0, 200.0);
 
 void setup() {
 
@@ -78,8 +78,6 @@ void loop()
     counter++;
     if (counter==30) { //Every ~5min pull the numbers from HRC-SR04 Rangefinder
         watertank();
-        client.publish("esp01-1/SENSOR/Tank", tank);
-        client.subscribe("esp01-1/SENSOR");
         counter = 0; //Reset the counter to start a new 5min count down
     }
     client.loop();
@@ -88,30 +86,34 @@ void loop()
 
 
 void watertank() {
-    inches2water = 0.0; //Initialize the variable for averaging
+    cm2water = 0.0; //Initialize the variable for averaging
     for (int l=0; l<3; l++) { //Take 3 readings from the sensor 2sec apart to get an average
-        inches2water = inches2water + rangefinder.getDistanceInch();
+        cm2water = cm2water + rangefinder.getDistanceCM();
         delay(2000);
     }
-    inches2water = (round((inches2water/3)*10)/10) - 2.0; //Take the average and then round the number to 1 decimal point
-    if (inches2water < 0.1) {
+    cm2water = (round((cm2water/3)*10)/10) - 2.0; //Take the average and then round the number to 1 decimal point
+    if (cm2water < 0.1) {
         tank = 100.0;
         h2opercent = 100.0;
     }
-        else if (inches2water > tank_limit) {
+        else if (cm2water > tank_limit) {
             tank = 0.0;
             h2opercent = 0.0;
         }
             else {
-                tank = round((100-((inches2water/tank_limit)*100))*10)/10;
-                h2opercent = round((100-((inches2water/tank_limit)*100))*10)/10;
+                tank = round((100-((cm2water/tank_limit)*100))*10)/10;
+                h2opercent = round((100-((cm2water/tank_limit)*100))*10)/10;
             } 
-//Will be changed to MQTT
-//    ubidots.add("WT_Tank",tank);
-//    ubidots.add("WT_Inches",inches2water);
-//    percent = String(h2opercent, 1);
-//    Particle.publish("<your stream name>", percent);  //Set this to your stream name
- //End Will be changed
+        client.publish("esp01-1/SENSOR/Tank", tank);
+        client.publish("esp01-1/SENSOR/cm2water", cm2water);
+        client.subscribe("esp01-1/SENSOR");
+
+        Serial.print("CM :");
+        Serial.println(cm2water);
+
+        Serial.print("Tank Level :");
+        Serial.println(tank);
+		
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
@@ -125,6 +127,4 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
 
   Serial.println();
-  Serial.println("-----------------------");
-
 }
