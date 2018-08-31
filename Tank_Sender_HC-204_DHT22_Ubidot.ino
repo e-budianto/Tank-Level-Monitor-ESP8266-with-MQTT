@@ -1,24 +1,12 @@
 // These #include statement were automatically added by the Particle IDE.
-#include <Ubidots.h>
 #include <Adafruit_DHT.h>
 #include <HC_SR04.h>
 
-#define DHTPIN D6
-#define DHTTYPE DHT22
 #define trigPin D1
 #define echoPin D2
-#define LEDPIN D7
-#define TOKEN "<your token>" //Set your specific Ubitoken here
-
-Ubidots ubidots(TOKEN);
-
-DHT dht(DHTPIN, DHTTYPE);
 
 float inches2water = 0.0;
 float tank = 0.0;
-double h2opercent = 0.0; //double type variable for particle cloud sharing
-float temp = 0.0;
-float hum = 0.0;
 int counter = 0;
 float tank_limit = 45.5; //Max distance to empty
 String percent;
@@ -43,34 +31,22 @@ HC_SR04 rangefinder = HC_SR04(trigPin, echoPin, 5.0, 150.0);
  
 void setup() 
 {
-    pinMode(LEDPIN,OUTPUT);
     Serial.begin(9600);
-    dht.begin();
     delay(2000);
     initialize();
 }
  
 void loop() 
 {
-    digitalWrite(LEDPIN,HIGH);  //Turn the LED on to act as an additional heartbeat
     counter++;
-    if (counter==30) { //Every ~5min pull the numbers from the DHT Sensor and HRC-SR04 Rangefinder
-        environmentals();
+    if (counter==30) { //Every ~5min pull the numbers from HRC-SR04 Rangefinder
         watertank();
-        ubidots.sendAll(); //Send all data at once to the Ubidot Cloud
+        // Send to MQTT
         counter = 0; //Reset the counter to start a new 5min count down
     }
     delay(5000);
-    digitalWrite(LEDPIN,LOW);
-    delay(5000);
 }
 
-void environmentals() { //Environmental Data Function
-    temp = round(dht.getTempCelcius()*100)/100; //Reads in Celcius
-    hum = round(dht.getHumidity()*100)/100; //Reads in %RH
-    ubidots.add("WT_Temp",temp);
-    ubidots.add("WT_Humidity",hum);
-}
 
 void watertank() {
     inches2water = 0.0; //Initialize the variable for averaging
@@ -91,14 +67,16 @@ void watertank() {
                 tank = round((100-((inches2water/tank_limit)*100))*10)/10;
                 h2opercent = round((100-((inches2water/tank_limit)*100))*10)/10;
             } 
-    ubidots.add("WT_Tank",tank);
-    ubidots.add("WT_Inches",inches2water);
-    percent = String(h2opercent, 1);
-    Particle.publish("<your stream name>", percent);  //Set this to your stream name
+//Will be changed to MQTT
+//    ubidots.add("WT_Tank",tank);
+//    ubidots.add("WT_Inches",inches2water);
+//    percent = String(h2opercent, 1);
+//    Particle.publish("<your stream name>", percent);  //Set this to your stream name
+ //End Will be changed
 }
 
 void initialize() {  //Take an initial reading so we don't have to wait 5min to see the results after reboot/updates
-    environmentals();
     watertank();
-    ubidots.sendAll(); //Send all data at once to the Ubidot Cloud
+ //Will be changed to MQTT
+//    ubidots.sendAll(); //Send all data at once to the Ubidot Cloud
 }
