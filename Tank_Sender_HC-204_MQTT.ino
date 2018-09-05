@@ -3,21 +3,27 @@
 #include <PubSubClient.h>
 #include <HC_SR04.h>
 
-#define trigPin D1
-#define echoPin D2
+#define trigPin 5 // D1 NodeMCU
+#define echoPin 4 // D2 NodeMCU
+#define vibratePin 14 // D5 NodeMCU
+
 
 const char* ssid = "YourNetworkName";
 const char* password =  "YourNetworkPassword";
 
 const char* mqttServer = "192.168.2.150";
-const int mqttPort = 8883;
+const int mqttPort = 1883;
 const char* mqttUser = "mqtt_user";
 const char* mqttPassword = "YourMqttUserPassword";
 
 float cm2water = 0.0;
 float tank = 0.0;
-int counter = 0;
-float tank_limit = 120; //Max distance to empty
+int counter1 = 0;
+int counter2 = 0;
+float tank_limit = 115; //Max distance to empty
+long last_vibrate1 = 0;
+long last_vibrate2 = 0;
+int pump_state = 0;
 String percent;
 
 
@@ -38,7 +44,7 @@ HC_SR04 rangefinder = HC_SR04(trigPin, echoPin, 5.0, 300.0);
  
 WiFiClient espClient;
 PubSubClient client(espClient); 
-HC_SR04 rangefinder = HC_SR04(trigPin, echoPin, 30.0, 200.0);
+HC_SR04 rangefinder = HC_SR04(trigPin, echoPin, 25.0, 120.0);
 
 void setup() {
 
@@ -75,13 +81,36 @@ void setup() {
  
 void loop() 
 {
-    counter++;
-    if (counter==30) { //Every ~5min pull the numbers from HRC-SR04 Rangefinder
+    long vibrate =TP_init();
+    counter1++;
+    counter2++;
+    if (counter1==150) { //Every ~5min pull the numbers from HRC-SR04 Rangefinder
         watertank();
-        counter = 0; //Reset the counter to start a new 5min count down
+        counter1 = 0; //Reset the counter to start a new 5min count down
     }
+	
+    if (vibrate==0) and (last_vibrate1==0) and (last_vibrate2==0) and (pump_state=1) {
+      pump_state = 0;
+      Serial.println("Pump confirmed Off");
+      client.publish("esp01-1/SENSOR/Pump", "Off");
+    }
+	
+    if (vibrate>50) and (last_vibrate1>50) and (last_vibrate2>50) and (pump_state=0){
+      pump_state = 1;
+      Serial.println("Pump confirmed On");
+      client.publish("esp01-1/SENSOR/Pump", "On");
+    }
+	
+    last_vibrate2 = last_vibrate1;	
+    last_vibrate1 = vibrate;
     client.loop();
-    delay(5000);
+    delay(200);
+}
+
+long TP_init(){
+  delay(10);
+  long measurement=pulseIn (vibr_Pin, HIGH);  //wait for the pin to get HIGH and returns measurement
+  return measurement;
 }
 
 
