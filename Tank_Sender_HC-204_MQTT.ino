@@ -1,26 +1,25 @@
-// These #include statement were automatically added by the Particle IDE.
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include <HC_SR04.h>
 
 #define trigPin 5 // D1 NodeMCU
 #define echoPin 4 // D2 NodeMCU
-#define vibratePin 14 // D5 NodeMCU
+#define vibr_Pin 14 // D5 NodeMCU
 
 
-const char* ssid = "YourNetworkName";
-const char* password =  "YourNetworkPassword";
-
-const char* mqttServer = "192.168.2.150";
+const char* ssid = "Your Wifi";
+const char* password =  "Wifi Password";
+ 
+const char* mqttServer = "mqtt server";
 const int mqttPort = 1883;
 const char* mqttUser = "mqtt_user";
-const char* mqttPassword = "YourMqttUserPassword";
+const char* mqttPassword = "mqtt_pass";
 
 float cm2water = 0.0;
 float tank = 0.0;
 int counter1 = 0;
 int counter2 = 0;
-float tank_limit = 115; //Max distance to empty
+float tank_limit = 200; //Max distance to empty
 long last_vibrate1 = 0;
 long last_vibrate2 = 0;
 int pump_state = 0;
@@ -44,7 +43,56 @@ HC_SR04 rangefinder = HC_SR04(trigPin, echoPin, 5.0, 300.0);
  
 WiFiClient espClient;
 PubSubClient client(espClient); 
-HC_SR04 rangefinder = HC_SR04(trigPin, echoPin, 25.0, 120.0);
+HC_SR04 rangefinder = HC_SR04(trigPin, echoPin, 5.0, 220.0);
+
+
+long TP_init(){
+  delay(10);
+  long measurement=pulseIn (vibr_Pin, HIGH);  //wait for the pin to get HIGH and returns measurement
+  return measurement;
+}
+
+
+void watertank() {
+    cm2water = 0.0; //Initialize the variable for averaging
+    for (int l=0; l<3; l++) { //Take 3 readings from the sensor 2sec apart to get an average
+        cm2water = cm2water + rangefinder.getDistanceCM();
+        delay(2000);
+    }
+    cm2water = (round((cm2water/3)*10)/10) - 2.0; //Take the average and then round the number to 1 decimal point
+    if (cm2water < 0.1) {
+        tank = 100.0;
+    }
+        else if (cm2water > tank_limit) {
+            tank = 0.0;
+        }
+            else {
+                tank = round((100-((cm2water/tank_limit)*100))*10)/10;
+            } 
+        client.publish("esp01-1/SENSOR/Tank", String(tank).c_str());
+        client.publish("esp01-1/SENSOR/cm2water", String(cm2water).c_str());
+        client.subscribe("esp01-1/SENSOR");
+
+        Serial.print("CM :");
+        Serial.println(cm2water);
+
+        Serial.print("Tank Level :");
+        Serial.println(tank);
+		
+}
+
+void callback(char* topic, byte* payload, unsigned int length) {
+
+  Serial.print("Message arrived in topic: ");
+  Serial.println(topic);
+
+  Serial.print("Message:");
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+  }
+
+  Serial.println();
+}
 
 void setup() {
 
@@ -84,18 +132,21 @@ void loop()
     long vibrate =TP_init();
     counter1++;
     counter2++;
-    if (counter1==150) { //Every ~5min pull the numbers from HRC-SR04 Rangefinder
+    if (counter1==150) 
+    { //Every ~5min pull the numbers from HRC-SR04 Rangefinder
         watertank();
         counter1 = 0; //Reset the counter to start a new 5min count down
     }
 	
-    if (vibrate==0) and (last_vibrate1==0) and (last_vibrate2==0) and (pump_state=1) {
+    if ((vibrate==0) and (last_vibrate1==0) and (last_vibrate2==0) and (pump_state=1)) 
+    {
       pump_state = 0;
       Serial.println("Pump confirmed Off");
       client.publish("esp01-1/SENSOR/Pump", "Off");
     }
 	
-    if (vibrate>50) and (last_vibrate1>50) and (last_vibrate2>50) and (pump_state=0){
+    if ((vibrate>50) and (last_vibrate1>50) and (last_vibrate2>50) and (pump_state=0))
+    {
       pump_state = 1;
       Serial.println("Pump confirmed On");
       client.publish("esp01-1/SENSOR/Pump", "On");
@@ -105,55 +156,4 @@ void loop()
     last_vibrate1 = vibrate;
     client.loop();
     delay(200);
-}
-
-long TP_init(){
-  delay(10);
-  long measurement=pulseIn (vibr_Pin, HIGH);  //wait for the pin to get HIGH and returns measurement
-  return measurement;
-}
-
-
-void watertank() {
-    cm2water = 0.0; //Initialize the variable for averaging
-    for (int l=0; l<3; l++) { //Take 3 readings from the sensor 2sec apart to get an average
-        cm2water = cm2water + rangefinder.getDistanceCM();
-        delay(2000);
-    }
-    cm2water = (round((cm2water/3)*10)/10) - 2.0; //Take the average and then round the number to 1 decimal point
-    if (cm2water < 0.1) {
-        tank = 100.0;
-        h2opercent = 100.0;
-    }
-        else if (cm2water > tank_limit) {
-            tank = 0.0;
-            h2opercent = 0.0;
-        }
-            else {
-                tank = round((100-((cm2water/tank_limit)*100))*10)/10;
-                h2opercent = round((100-((cm2water/tank_limit)*100))*10)/10;
-            } 
-        client.publish("esp01-1/SENSOR/Tank", tank);
-        client.publish("esp01-1/SENSOR/cm2water", cm2water);
-        client.subscribe("esp01-1/SENSOR");
-
-        Serial.print("CM :");
-        Serial.println(cm2water);
-
-        Serial.print("Tank Level :");
-        Serial.println(tank);
-		
-}
-
-void callback(char* topic, byte* payload, unsigned int length) {
-
-  Serial.print("Message arrived in topic: ");
-  Serial.println(topic);
-
-  Serial.print("Message:");
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
-  }
-
-  Serial.println();
 }
